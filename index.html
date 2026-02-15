@@ -3,59 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaflet - Prepínanie vrstiev</title>
+    <title>Leaflet Mapa s Navigáciou</title>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+
     <style>
-        #map { height: 600px; width: 100%; border-radius: 12px; }
-        body { font-family: sans-serif; padding: 20px; background: #eee; }
-        .controls-info { background: white; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        body { margin: 0; padding: 20px; font-family: sans-serif; background: #f0f0f0; }
+        #map { height: 600px; width: 100%; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .info { background: white; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
     </style>
 </head>
 <body>
 
-    <div class="controls-info">
-        <strong>Tip:</strong> Klikni na ikonku vrstiev vpravo hore pre skrytie/zobrazenie loga.
+    <div class="info">
+        <strong>Navigácia:</strong> Modré značky na mape môžeš chytať a presúvať myšou pre zmenu trasy.
     </div>
+    
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // 1. Základná mapa
+        // Nastavenie mapy (zákaz opakovania sveta)
         var map = L.map('map', {
-            center: [48.66, 19.50],
-            zoom: 7,
+            center: [48.1485, 17.1077],
+            zoom: 13,
             minZoom: 3,
             maxBounds: [[-90, -180], [90, 180]],
             maxBoundsViscosity: 1.0
         });
 
-        // 2. Podkladová mapa (Base Layer)
+        // Základná vrstva
         var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             noWrap: true,
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        // 3. Vytvoríme "skupinu" pre tvoje logo/ikonku
-        // Tu namiesto markeru môžeš mať čokoľvek
-        var logoMarker = L.marker([48.1485, 17.1077]); 
-        logoMarker.bindPopup("Tu je moje logo!");
+        // VRSTVA PRE LOGO (prepínateľná)
+        var logoMarker = L.marker([48.1485, 17.1077]).bindPopup("Moje Logo / Firma");
+        var vrstvaLogo = L.layerGroup([logoMarker]).addTo(map);
 
-        // Vložíme marker do LayerGroup (skupiny vrstiev)
-        var mojeLogoVrstvy = L.layerGroup([logoMarker]).addTo(map);
+        // --- NAVIGÁCIA (Routing) ---
+        var controlNavigacie = L.Routing.control({
+            waypoints: [
+                L.latLng(48.1485, 17.1077), // Štart (Bratislava)
+                L.latLng(48.1700, 17.1500)  // Cieľ (Príklad)
+            ],
+            lineOptions: {
+                styles: [{ color: 'blue', opacity: 0.6, weight: 6 }]
+            },
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1'
+            }),
+            show: true, // Zobrazí textový itinerár
+            language: 'sk' // Jazyk pokynov
+        }).addTo(map);
 
-        // 4. Definícia objektov pre ovládací panel
-        var baseMaps = {
-            "Mapa (OSM)": osm
+        // Prepínač vrstiev (ikonka vpravo hore)
+        var baseMaps = { "Mapa": osm };
+        var overlayMaps = { 
+            "Zobraziť Logo": vrstvaLogo,
+            "Zobraziť Navigáciu": controlNavigacie // Môžeš pridať aj navigáciu do zoznamu
         };
 
-        var overlayMaps = {
-            "Zobraziť Logo": mojeLogoVrstvy
-        };
-
-        // 5. Pridanie ikonky (ovládacieho prvku) na mapu
         L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
+        // Bonus: Funkcia na skrytie/zobrazenie navigácie cez kód
+        // Ak chceš navigáciu vypnúť úplne, stačí zavolať: map.removeControl(controlNavigacie);
     </script>
 </body>
 </html>
