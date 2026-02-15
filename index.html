@@ -3,77 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaflet Mapa s Navigáciou</title>
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    <title>Moja GPS Mapa</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
 
     <style>
-        body { margin: 0; padding: 20px; font-family: sans-serif; background: #f0f0f0; }
-        #map { height: 600px; width: 100%; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        .info { background: white; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
+        #map { height: 100vh; width: 100%; }
+
+        /* Tlačidlo pre moju polohu */
+        .loc-btn {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            z-index: 1000;
+            background: white;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .loc-btn:hover { background: #f4f4f4; }
     </style>
 </head>
 <body>
 
-    <div class="info">
-        <strong>Navigácia:</strong> Modré značky na mape môžeš chytať a presúvať myšou pre zmenu trasy.
-    </div>
-    
+    <button class="loc-btn" onclick="najdiMa()" title="Moja poloha">📍</button>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
     <script>
-        // Nastavenie mapy (zákaz opakovania sveta)
+        // --- INICIALIZÁCIA MAPY ---
         var map = L.map('map', {
-            center: [48.1485, 17.1077],
-            zoom: 13,
+            center: [48.66, 19.50],
+            zoom: 7,
             minZoom: 3,
             maxBounds: [[-90, -180], [90, 180]],
             maxBoundsViscosity: 1.0
         });
 
-        // Základná vrstva
+        // --- MAPOVÝ PODKLAD (Bez opakovania sveta) ---
         var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             noWrap: true,
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        // VRSTVA PRE LOGO (prepínateľná)
-        var logoMarker = L.marker([48.1485, 17.1077]).bindPopup("Moje Logo / Firma");
+        // --- MOJE LOGO / FIRMA ---
+        var logoMarker = L.marker([48.1485, 17.1077]).bindPopup("<b>Moje Logo</b><br>Bratislava");
         var vrstvaLogo = L.layerGroup([logoMarker]).addTo(map);
 
-        // --- NAVIGÁCIA (Routing) ---
-        var controlNavigacie = L.Routing.control({
-            waypoints: [
-                L.latLng(48.1485, 17.1077), // Štart (Bratislava)
-                L.latLng(48.1700, 17.1500)  // Cieľ (Príklad)
-            ],
-            lineOptions: {
-                styles: [{ color: 'blue', opacity: 0.6, weight: 6 }]
-            },
-            router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1'
-            }),
-            show: true, // Zobrazí textový itinerár
-            language: 'sk' // Jazyk pokynov
+        // --- NAVIGÁCIA A VYHĽADÁVANIE ---
+        var routingControl = L.Routing.control({
+            waypoints: [null, null], // Prázdne body pri štarte
+            routeWhileDragging: true,
+            language: 'sk',
+            geocoder: L.Control.Geocoder.nominatim(), // Toto pridá vyhľadávanie do políčok
+            collapsible: true,
+            placeholder: 'Hľadaj adresu...'
         }).addTo(map);
 
-        // Prepínač vrstiev (ikonka vpravo hore)
+        // --- PREPÍNAČ VRSTIEV (Ikonka vpravo hore) ---
         var baseMaps = { "Mapa": osm };
-        var overlayMaps = { 
-            "Zobraziť Logo": vrstvaLogo,
-            "Zobraziť Navigáciu": controlNavigacie // Môžeš pridať aj navigáciu do zoznamu
-        };
-
+        var overlayMaps = { "Zobraziť Logo": vrstvaLogo };
         L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
-        // Bonus: Funkcia na skrytie/zobrazenie navigácie cez kód
-        // Ak chceš navigáciu vypnúť úplne, stačí zavolať: map.removeControl(controlNavigacie);
+        // --- FUNKCIA PRE GEOLOKÁCIU (Kde som?) ---
+        function najdiMa() {
+            map.locate({setView: true, maxZoom: 15});
+        }
+
+        // Keď sa poloha nájde
+        map.on('locationfound', function(e) {
+            // Nastaví tvoju polohu ako Bod A (štart)
+            routingControl.spliceWaypoints(0, 1, e.latlng);
+            
+            // Pridá malý krúžok na tvoju pozíciu
+            L.circle(e.latlng, { radius: 10, color: 'blue' }).addTo(map);
+        });
+
+        // Ak sa polohu nepodarí zistiť
+        map.on('locationerror', function(e) {
+            alert("Prístup k polohe bol zamietnutý alebo zlyhal.");
+        });
+
+        // Spustenie lokalizácie ihneď po načítaní
+        window.onload = najdiMa;
+
     </script>
 </body>
 </html>
