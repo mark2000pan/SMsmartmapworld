@@ -3,113 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moja prvá 3D scéna (Three.js)</title>
+    <title>Leaflet - Prepínanie vrstiev</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Aby neboli posuvníky */
-            background-color: #111;
-            color: white;
-            font-family: Arial, sans-serif;
-            text-align: center;
-        }
-        canvas {
-            display: block;
-        }
-        h1 {
-            position: absolute;
-            width: 100%;
-            top: 10px;
-            color: rgba(255, 255, 255, 0.7);
-            font-weight: normal;
-        }
+        #map { height: 600px; width: 100%; border-radius: 12px; }
+        body { font-family: sans-serif; padding: 20px; background: #eee; }
+        .controls-info { background: white; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <h1>Základ 3D Hry: Scéna a Objekt</h1>
-    
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-        }
-    }
-    </script>
 
-    <script type="module">
-        // Importujeme všetko potrebné z knižnice 'three'
-        import * as THREE from 'three';
+    <div class="controls-info">
+        <strong>Tip:</strong> Klikni na ikonku vrstiev vpravo hore pre skrytie/zobrazenie loga.
+    </div>
+    <div id="map"></div>
 
-        // --- 1. Základné nastavenie (Scéna, Kamera, Renderer) ---
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-        // Scéna (Scene) je ako pódium. Drží všetky objekty, svetlá a kamery.
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x222222); // Tmavé pozadie
-
-        // Kamera (Camera) je to, čím sa na scénu pozeráme.
-        // PerspectiveCamera (FOV, Aspect Ratio, Near, Far)
-        const camera = new THREE.PerspectiveCamera(
-            75, // Uhol pohľadu (Field of View)
-            window.innerWidth / window.innerHeight, // Pomer strán
-            0.1, // Ako blízko vidí
-            1000 // Ako ďaleko vidí
-        );
-        camera.position.z = 5; // Posunieme kameru dozadu, aby sme kocku videli
-
-        // Renderer je "maliar", ktorý vezme scénu a kameru a vykreslí to na HTML <canvas>
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight); // Veľkosť na celú obrazovku
-        document.body.appendChild(renderer.domElement); // Pridáme canvas do stránky
-
-        // --- 2. Vytvorenie 3D Objektu (Kocky) ---
-
-        // Každý 3D objekt potrebuje dve veci:
-        // a) Geometriu (Geometry) - Tvar (kocka, guľa, vlastný model...)
-        const geometry = new THREE.BoxGeometry(1, 1, 1); // Kocka s rozmermi 1x1x1
-
-        // b) Materiál (Material) - Vzhľad (farba, textúra, lesk...)
-        // MeshBasicMaterial nepotrebuje svetlo.
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 }); // Zelená farba
-
-        // Mesh je finálny objekt, ktorý spája Geometriu a Materiál.
-        const cube = new THREE.Mesh(geometry, material);
-
-        // Pridáme kocku na scénu
-        scene.add(cube);
-        
-        // --- 3. Pridanie svetla (aby iné materiály fungovali) ---
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(1, 1, 5); // Prichádza z pravej hornej strany
-        scene.add(light);
-        
-        const ambientLight = new THREE.AmbientLight(0x404040); // Mäkké svetlo všade
-        scene.add(ambientLight);
-
-        // --- 4. Animačná slučka (Game Loop) ---
-
-        // Funkcia, ktorá sa volá znova a znova, 60-krát za sekundu
-        function animate() {
-            // Požiadame prehliadač, aby zavolal túto funkciu pri ďalšom snímku
-            requestAnimationFrame(animate);
-
-            // Animácia: Rotujeme kocku
-            cube.rotation.x += 0.01;
-            cube.rotation.y += 0.01;
-
-            // Vykreslíme výsledok
-            renderer.render(scene, camera);
-        }
-
-        // --- 5. Spustenie animácie ---
-        animate();
-        
-        // --- Pomocná funkcia: Zmena veľkosti okna ---
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+    <script>
+        // 1. Základná mapa
+        var map = L.map('map', {
+            center: [48.66, 19.50],
+            zoom: 7,
+            minZoom: 3,
+            maxBounds: [[-90, -180], [90, 180]],
+            maxBoundsViscosity: 1.0
         });
+
+        // 2. Podkladová mapa (Base Layer)
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            noWrap: true,
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        // 3. Vytvoríme "skupinu" pre tvoje logo/ikonku
+        // Tu namiesto markeru môžeš mať čokoľvek
+        var logoMarker = L.marker([48.1485, 17.1077]); 
+        logoMarker.bindPopup("Tu je moje logo!");
+
+        // Vložíme marker do LayerGroup (skupiny vrstiev)
+        var mojeLogoVrstvy = L.layerGroup([logoMarker]).addTo(map);
+
+        // 4. Definícia objektov pre ovládací panel
+        var baseMaps = {
+            "Mapa (OSM)": osm
+        };
+
+        var overlayMaps = {
+            "Zobraziť Logo": mojeLogoVrstvy
+        };
+
+        // 5. Pridanie ikonky (ovládacieho prvku) na mapu
+        L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
     </script>
 </body>
