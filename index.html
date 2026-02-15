@@ -4,40 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
-    <title>Moja GPS Mapa</title>
+    <title>Automatická Navigácia</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; }
         #map { height: 100vh; width: 100%; }
-
-        /* Tlačidlo pre moju polohu */
-        .loc-btn {
-            position: absolute;
-            bottom: 25px;
-            right: 25px;
-            z-index: 1000;
-            background: white;
-            border: 2px solid rgba(0,0,0,0.2);
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            cursor: pointer;
-            font-size: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        
+        /* Schováme zbytočné textové pokyny, aby zostala len mapa a vyhľadávač */
+        .leaflet-routing-container { 
+            max-height: 150px !important; 
+            overflow-y: auto; 
         }
-        .loc-btn:hover { background: #f4f4f4; }
     </style>
 </head>
 <body>
 
-    <button class="loc-btn" onclick="najdiMa()" title="Moja poloha">📍</button>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -45,61 +30,62 @@
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
     <script>
-        // --- INICIALIZÁCIA MAPY ---
-        var map = L.map('map', {
-            center: [48.66, 19.50],
-            zoom: 7,
-            minZoom: 3,
-            maxBounds: [[-90, -180], [90, 180]],
-            maxBoundsViscosity: 1.0
-        });
+        // 1. Nastavenie mapy
+        var map = L.map('map').setView([48.66, 19.50], 7);
 
-        // --- MAPOVÝ PODKLAD (Bez opakovania sveta) ---
-        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            noWrap: true,
-            attribution: '&copy; OpenStreetMap'
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            noWrap: true
         }).addTo(map);
 
-        // --- MOJE LOGO / FIRMA ---
-        var logoMarker = L.marker([48.1485, 17.1077]).bindPopup("<b>Moje Logo</b><br>Bratislava");
-        var vrstvaLogo = L.layerGroup([logoMarker]).addTo(map);
-
-        // --- NAVIGÁCIA A VYHĽADÁVANIE ---
+        // 2. Inicializácia navigácie
         var routingControl = L.Routing.control({
-            waypoints: [null, null], // Prázdne body pri štarte
+            waypoints: [
+                null, // Tu bude tvoja poloha (Bod A)
+                null  // Sem budeš písať cieľ (Bod B)
+            ],
+            geocoder: L.Control.Geocoder.nominatim(),
             routeWhileDragging: true,
             language: 'sk',
-            geocoder: L.Control.Geocoder.nominatim(), // Toto pridá vyhľadávanie do políčok
-            collapsible: true,
-            placeholder: 'Hľadaj adresu...'
+            addWaypoints: false, // Nedovolíme pridávať ďalšie body, len A a B
+            collapsible: false
         }).addTo(map);
 
-        // --- PREPÍNAČ VRSTIEV (Ikonka vpravo hore) ---
-        var baseMaps = { "Mapa": osm };
-        var overlayMaps = { "Zobraziť Logo": vrstvaLogo };
-        L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
-
-        // --- FUNKCIA PRE GEOLOKÁCIU (Kde som?) ---
-        function najdiMa() {
-            map.locate({setView: true, maxZoom: 15});
+        // 3. Funkcia na snímanie tvojej polohy
+        function aktualizujPolohu() {
+            map.locate({
+                setView: false, // Nechceme, aby mapa skákala každú sekundu
+                watch: true,    // "Sleduje" tvoj pohyb
+                enableHighAccuracy: true
+            });
         }
 
-        // Keď sa poloha nájde
+        // Keď systém nájde tvoju polohu
         map.on('locationfound', function(e) {
-            // Nastaví tvoju polohu ako Bod A (štart)
+            // Ak ešte nemáme cieľ, vycentrujeme mapu na teba
+            if (!routingControl.getWaypoints()[1].latLng) {
+                map.setView(e.latlng, 14);
+            }
+
+            // VŽDY nastavíme tvoju aktuálnu polohu ako Bod A
             routingControl.spliceWaypoints(0, 1, e.latlng);
-            
-            // Pridá malý krúžok na tvoju pozíciu
-            L.circle(e.latlng, { radius: 10, color: 'blue' }).addTo(map);
+
+            // Pridáme/aktualizujeme tvoju značku na mape
+            if (window.myLocationMarker) {
+                window.myLocationMarker.setLatLng(e.latlng);
+            } else {
+                window.myLocationMarker = L.circleMarker(e.latlng, {
+                    radius: 8, color: 'white', fillColor: '#007bff', fillOpacity: 1, weight: 2
+                }).addTo(map).bindPopup("Ty si tu");
+            }
         });
 
-        // Ak sa polohu nepodarí zistiť
-        map.on('locationerror', function(e) {
-            alert("Prístup k polohe bol zamietnutý alebo zlyhal.");
+        map.on('locationerror', function() {
+            console.log("Nepodarilo sa získať polohu. Skontroluj GPS.");
         });
 
-        // Spustenie lokalizácie ihneď po načítaní
-        window.onload = najdiMa;
+        // Spustíme sledovanie
+        aktualizujPolohu();
 
     </script>
 </body>
